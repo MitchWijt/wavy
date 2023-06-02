@@ -628,6 +628,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43b2853a4d09f215c24cc5489c992ce46052d359b5109343cbafbf26bc62f8a3"
 
 [[package]]
+name = "simple-bytes"
+version = "0.2.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aa2918786cb2caa43531999c275e69d0ab5acf68235702aec75ad1936d9bac89"
+
+[[package]]
 name = "smallvec"
 version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -779,6 +785,7 @@ name = "wav-decoder"
 version = "0.1.0"
 dependencies = [
  "cpal",
+ "simple-bytes",
 ]
 
 [[package]]

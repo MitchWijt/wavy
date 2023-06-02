@@ -5,6 +5,7 @@ use std::thread;
 use std::time::Duration;
 use cpal::{BufferSize, OutputCallbackInfo, Sample, SampleRate, StreamConfig, SupportedStreamConfig, SupportedStreamConfigRange};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use simple_bytes::{Bytes, BytesRead};
 
 #[derive(Debug)]
 struct RiffChunk {
@@ -41,20 +42,24 @@ fn main() {
     let fmt_sub_chunk = FmtSubChunk::new(&wav_header);
     let data_sub_chunk = DataSubChunk::new(&wav_header);
 
+    println!("{:?}", riff_chunk);
     println!("{:?}", fmt_sub_chunk);
+    println!("{:?}", data_sub_chunk);
 
     let mut bytes_per_sample: Vec<ByteSample> = Vec::new();
     let samples = data_sub_chunk.chunk_size / fmt_sub_chunk.channels as u32 / ((fmt_sub_chunk.bits_per_sample / 8) as u32);
 
     let mut byte_index = 0;
-    for _ in 1..samples + 1 {
-        let byte1 = *wav_data.get(byte_index).unwrap();
-        let byte2 = *wav_data.get(byte_index + 1).unwrap();
+    for s in 0..samples {
+        for b in 0..fmt_sub_chunk.channels {
+            let byte1 = *wav_data.get(byte_index).unwrap();
+            let byte2 = *wav_data.get(byte_index + 1).unwrap();
 
-        let byte_sample = ByteSample(byte1, byte2);
-        bytes_per_sample.push(byte_sample);
+            let byte_sample = ByteSample(byte1, byte2);
+            bytes_per_sample.push(byte_sample);
 
-        byte_index += 2;
+            byte_index += 2;
+        }
     }
 
     let host = cpal::default_host();
@@ -66,24 +71,17 @@ fn main() {
     let output_config = StreamConfig::from(supported_config);
 
     let mut wav_index = 0;
-    let channels = output_config.channels as usize;
-
     let stream = device.build_output_stream(
         &output_config,
         move | data: &mut [f32], info: &OutputCallbackInfo | {
-            for frame in data.chunks_mut(channels) {
-                if wav_index >= bytes_per_sample.len() {
-                    wav_index = 0;
-                }
+            for sample in data.iter_mut() {
+                let byte_sample = bytes_per_sample.get(wav_index).unwrap();
+                let bytes_slice = &vec![byte_sample.0, byte_sample.1][0..2];
 
-                let bytes = bytes_per_sample.get(wav_index).unwrap();
-                let fixed_size: [u8; 2] = [bytes.0, bytes.1];
+                let mut bytes: Bytes = bytes_slice.into();
+                let sample_value = bytes.read_le_i16();
 
-                let little_endian_byte = u16::from_le_bytes(fixed_size);
-
-                for sample in frame.iter_mut() {
-                    *sample = Sample::from(&little_endian_byte);
-                }
+                *sample = Sample::from(&sample_value);
 
                 wav_index += 1;
             }
@@ -101,7 +99,7 @@ fn main() {
 }
 
 pub fn read_wav_bytes() -> (Vec<u8>, Vec<u8>) {
-    let file = File::open("assets/sine.wav").unwrap();
+    let file = File::open("assets/track.wav").unwrap();
     let mut reader = BufReader::new(file);
     let bytes = reader.bytes();
 
@@ -111,7 +109,6 @@ pub fn read_wav_bytes() -> (Vec<u8>, Vec<u8>) {
     let mut index = 0;
     for byte in bytes {
         if index >= 44 {
-            // not good, loading whole song into memory
             wav_data_bytes.push(byte.unwrap());
         } else {
             wav_header.push(byte.unwrap());

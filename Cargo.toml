@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 cpal = "0.13.0"
+simple-bytes = "0.2.11"
