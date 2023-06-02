@@ -1,12 +1,9 @@
-use std::fs::File;
-use std::io::BufReader;
 use cpal::{Device, Host, OutputCallbackInfo, Sample, SampleRate, StreamConfig};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use simple_bytes::{Bytes, BytesRead};
 use crate::Wav;
 
 pub struct Player {
-    host: Host,
     device: Device,
     config: StreamConfig,
 }
@@ -25,7 +22,6 @@ impl Player {
         let output_config = StreamConfig::from(supported_config);
 
         Player {
-            host,
             device,
             config: output_config
         }
@@ -33,15 +29,16 @@ impl Player {
 
     pub fn play(&self, mut wav: Wav) {
         let mut bytes_read = 0;
-        let mut bytes = wav.read_buffer();
+        let mut bytes = Vec::new();
         let mut byte_index = 0;
 
         let stream = self.device.build_output_stream(
             &self.config,
-            move | data: &mut [f32], info: &OutputCallbackInfo | {
+            move | data: &mut [f32], _: &OutputCallbackInfo | {
+                let size = data.len();
                 for sample in data.iter_mut() {
-                    if bytes_read % 1024 == 0 {
-                        bytes = wav.read_buffer();
+                    if bytes_read % size == 0 {
+                        bytes = wav.read_buffer(size);
                         byte_index = 0;
                     }
 

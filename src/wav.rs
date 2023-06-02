@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufReader, Read};
 use std::path::Path;
 
 pub struct Wav {
@@ -29,8 +29,8 @@ impl Wav {
         }
     }
 
-    pub fn read_buffer(&mut self) -> Vec<u8> {
-        let mut buffer = vec![0u8; 1024];
+    pub fn read_buffer(&mut self, size: usize) -> Vec<u8> {
+        let mut buffer = vec![0u8; size];
         self.audio_data_reader.read_exact(&mut buffer).expect("Error when reading buffer");
 
         buffer
