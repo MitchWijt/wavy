@@ -3,7 +3,7 @@ use std::io::{BufRead, BufReader, Read};
 use std::str::Chars;
 use std::thread;
 use std::time::Duration;
-use cpal::{BufferSize, OutputCallbackInfo, Sample, SampleRate, StreamConfig, SupportedStreamConfig, SupportedStreamConfigRange};
+use cpal::{BufferSize, OutputCallbackInfo, Sample, SampleFormat, SampleRate, StreamConfig, SupportedStreamConfig, SupportedStreamConfigRange};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use simple_bytes::{Bytes, BytesRead};
 
@@ -67,7 +67,9 @@ fn main() {
 
     let mut supported_configs_range = device.supported_output_configs()
         .expect("error while querying configs");
-    let supported_config = supported_configs_range.last().unwrap().with_max_sample_rate();
+
+    let ranges = supported_configs_range.filter(|d| d.max_sample_rate() == SampleRate(44100));
+    let supported_config = ranges.last().unwrap().with_max_sample_rate();
     let output_config = StreamConfig::from(supported_config);
 
     let mut wav_index = 0;
