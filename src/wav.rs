@@ -1,14 +1,14 @@
 use std::cmp::min;
+use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::Path;
+use std::ptr::write;
 use std::time::Duration;
 
 pub struct Wav {
-    pub riff: RiffChunk,
-    pub fmt: FmtSubChunk,
-    pub data: DataSubChunk,
-    pub duration: String,
+    pub header: WavHeader,
+    pub duration: WavDuration,
     audio_data_reader: BufReader<File>
 }
 
@@ -17,29 +17,14 @@ impl Wav {
         let file = File::open(path).expect("Unable to open WAV file");
         let mut reader = BufReader::new(file);
 
-        let mut header = vec![0u8; 44];
-        reader.read_exact(&mut header).expect("Error when reading header");
+        let mut header_bytes = vec![0u8; 44];
+        reader.read_exact(&mut header_bytes).expect("Error when reading header");
 
-        let riff_chunk = RiffChunk::from_header(&header);
-        let fmt_sub_chunk = FmtSubChunk::from_header(&header);
-        let data_sub_chunk = DataSubChunk::from_header(&header);
-
-        // make a function of some sorts out of this. We also need a PlaybackState of some sorts.
-        // we can work with Mutexes to share data between the stream thread and the main thread.
-        let samples: f32 = (data_sub_chunk.chunk_size / ((fmt_sub_chunk.channels * fmt_sub_chunk.bits_per_sample / 8) as u32)) as f32;
-
-        let seconds: f32 = samples / (fmt_sub_chunk.sample_rate as f32);
-        let minutes: f32 = seconds / 60.0;
-        let rounded_minutes = minutes.floor();
-        let remaining_seconds = minutes % rounded_minutes;
-        let seconds = (remaining_seconds * 60.0).ceil();
-
-        let duration = format!("{}:{}", rounded_minutes, seconds);
+        let header = WavHeader::from_header_bytes(header_bytes);
+        let duration = WavDuration::from_header(&header);
 
         Wav {
-            riff: riff_chunk,
-            fmt: fmt_sub_chunk,
-            data: data_sub_chunk,
+            header,
             duration,
             audio_data_reader: reader,
         }
@@ -53,6 +38,72 @@ impl Wav {
     }
 }
 
+pub struct WavDuration {
+    pub raw_seconds: f32,
+    pub seconds: f32,
+    pub raw_minutes: f32,
+    pub minutes: f32
+}
+
+impl WavDuration {
+    pub fn from_header(header: &WavHeader) -> Self {
+        let samples: f32 = (header.data.chunk_size / ((header.fmt.channels * header.fmt.bits_per_sample / 8) as u32)) as f32;
+
+        let raw_seconds: f32 = samples / (header.fmt.sample_rate as f32);
+        let raw_minutes: f32 = raw_seconds / 60.0;
+
+        let minutes = raw_minutes.floor();
+
+        let remaining_seconds = raw_minutes % minutes;
+        let seconds = (remaining_seconds * 60.0).ceil();
+
+        WavDuration {
+            raw_seconds,
+            seconds,
+            raw_minutes,
+            minutes
+        }
+    }
+}
+
+impl Display for WavDuration {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let minutes = if self.minutes < 10.0 {
+            format!("0{}", self.minutes)
+        } else {
+            format!("{}", self.minutes)
+        };
+
+        let seconds = if self.seconds < 10.0 {
+            format!("0{}", self.seconds)
+        } else {
+            format!("{}", self.seconds)
+        };
+
+        write!(f, "{}:{}", minutes, seconds)
+    }
+}
+
+pub struct WavHeader {
+    pub riff: RiffChunk,
+    pub fmt: FmtSubChunk,
+    pub data: DataSubChunk,
+}
+
+impl WavHeader {
+    pub fn from_header_bytes(header: Vec<u8>) -> Self {
+        let riff_chunk = RiffChunk::from_header_bytes(&header);
+        let fmt_sub_chunk = FmtSubChunk::from_header_bytes(&header);
+        let data_sub_chunk = DataSubChunk::from_header_bytes(&header);
+
+        WavHeader {
+            riff: riff_chunk,
+            fmt: fmt_sub_chunk,
+            data: data_sub_chunk
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct RiffChunk {
     chunk_id: String,
@@ -61,7 +112,7 @@ pub struct RiffChunk {
 }
 
 impl RiffChunk {
-    pub fn from_header(wav_header: &Vec<u8>) -> Self {
+    pub fn from_header_bytes(wav_header: &Vec<u8>) -> Self {
         let chunk_id_bytes = &wav_header[0..4];
 
         let chunk_size_bytes = &wav_header[4..8];
@@ -94,7 +145,7 @@ pub struct FmtSubChunk {
 }
 
 impl FmtSubChunk {
-    pub fn from_header(wav_header: &Vec<u8>) -> Self {
+    pub fn from_header_bytes(wav_header: &Vec<u8>) -> Self {
         let chunk_id_bytes = &wav_header[12..16];
         let chunk_size_bytes: [u8; 4] = (&wav_header[16..20]).try_into().expect("Incorrect amount of bytes");
         let audio_format_bytes: [u8; 2] = (&wav_header[20..22]).try_into().expect("Incorrect amount of bytes");
@@ -133,7 +184,7 @@ pub struct DataSubChunk {
 }
 
 impl DataSubChunk {
-    pub fn from_header(wav_header: &Vec<u8>) -> Self {
+    pub fn from_header_bytes(wav_header: &Vec<u8>) -> Self {
         let chunk_id_bytes = &wav_header[36..40];
         let chunk_size_bytes: [u8; 4] = (&wav_header[40..44]).try_into().expect("Incorrect amount of bytes");
 
