@@ -1,8 +1,55 @@
-struct PlaybackState {
-    playing: bool,
-    seconds_playing: u32,
-    minutes_playing: u32,
-    buffer: Vec<u8>,
-    buffer_index: u32,
-    bytes_read: u32
+use std::fmt::{Display, Formatter};
+
+pub struct PlaybackState {
+    pub playing: bool,
+    pub playback_duration: PlaybackDuration
+}
+
+impl PlaybackState {
+    pub fn new() -> Self {
+        PlaybackState {
+            playing: false,
+            playback_duration: PlaybackDuration::new()
+        }
+    }
+}
+
+pub struct PlaybackDuration {
+    pub seconds: u32,
+    pub minutes: u32,
+}
+
+impl PlaybackDuration {
+    pub fn new() -> Self {
+        PlaybackDuration {
+            seconds: 0,
+            minutes: 0,
+        }
+    }
+
+    pub fn advance(&mut self) {
+        self.seconds += 1;
+        if self.seconds == 60 {
+            self.minutes += 1;
+            self.seconds = 0;
+        }
+    }
+}
+
+impl Display for PlaybackDuration {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let minutes = if self.minutes < 10 {
+            format!("0{}", self.minutes)
+        } else {
+            format!("{}", self.minutes)
+        };
+
+        let seconds = if self.seconds < 10 {
+            format!("0{}", self.seconds)
+        } else {
+            format!("{}", self.seconds)
+        };
+
+        write!(f, "{}:{}", minutes, seconds)
+    }
 }

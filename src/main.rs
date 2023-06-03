@@ -1,3 +1,6 @@
+use std::thread;
+use std::thread::Thread;
+use std::time::Duration;
 use crate::player::Player;
 use crate::wav::Wav;
 
@@ -10,7 +13,7 @@ struct ByteSample (u8, u8);
 
 fn main() {
     let wav = Wav::new("assets/track2.wav");
-    let player = Player::new();
 
+    let mut player = Player::new();
     player.play(wav);
 }
