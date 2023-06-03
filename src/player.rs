@@ -1,3 +1,5 @@
+use std::thread;
+use std::time::Duration;
 use cpal::{Device, Host, OutputCallbackInfo, Sample, SampleRate, StreamConfig};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use simple_bytes::{Bytes, BytesRead};
@@ -32,6 +34,9 @@ impl Player {
         let mut bytes = Vec::new();
         let mut byte_index = 0;
 
+        let mut seconds = 00;
+        let mut minutes = 00;
+
         let stream = self.device.build_output_stream(
             &self.config,
             move | data: &mut [f32], _: &OutputCallbackInfo | {
@@ -51,6 +56,16 @@ impl Player {
 
                     bytes_read += 2;
                     byte_index += 2;
+
+                    if bytes_read % (44100 * 4) == 0 && bytes_read != 0 {
+                        seconds += 1;
+                        if seconds == 60 {
+                            minutes += 1;
+                            seconds = 00;
+                        }
+
+                        println!("{}:{}    {}", minutes, seconds, wav.duration);
+                    }
                 }
             },
 

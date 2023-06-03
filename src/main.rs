@@ -8,7 +8,9 @@ mod wav;
 struct ByteSample (u8, u8);
 
 fn main() {
-    let wav = Wav::new("assets/track.wav");
+    let wav = Wav::new("assets/track2.wav");
+    println!("{:?}", wav.data);
+    println!("{:?}", wav.fmt);
     let player = Player::new();
 
     player.play(wav);

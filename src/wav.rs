@@ -1,11 +1,14 @@
+use std::cmp::min;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::Path;
+use std::time::Duration;
 
 pub struct Wav {
     pub riff: RiffChunk,
     pub fmt: FmtSubChunk,
     pub data: DataSubChunk,
+    pub duration: String,
     audio_data_reader: BufReader<File>
 }
 
@@ -21,10 +24,23 @@ impl Wav {
         let fmt_sub_chunk = FmtSubChunk::from_header(&header);
         let data_sub_chunk = DataSubChunk::from_header(&header);
 
+        // make a function of some sorts out of this. We also need a PlaybackState of some sorts.
+        // we can work with Mutexes to share data between the stream thread and the main thread.
+        let samples: f32 = (data_sub_chunk.chunk_size / ((fmt_sub_chunk.channels * fmt_sub_chunk.bits_per_sample / 8) as u32)) as f32;
+
+        let seconds: f32 = samples / (fmt_sub_chunk.sample_rate as f32);
+        let minutes: f32 = seconds / 60.0;
+        let rounded_minutes = minutes.floor();
+        let remaining_seconds = minutes % rounded_minutes;
+        let seconds = (remaining_seconds * 60.0).ceil();
+
+        let duration = format!("{}:{}", rounded_minutes, seconds);
+
         Wav {
             riff: riff_chunk,
             fmt: fmt_sub_chunk,
             data: data_sub_chunk,
+            duration,
             audio_data_reader: reader,
         }
     }
@@ -67,9 +83,9 @@ impl RiffChunk {
 
 #[derive(Debug)]
 pub struct FmtSubChunk {
-    chunk_id: String,
-    chunk_size: u32,
-    audio_format: u16,
+    pub chunk_id: String,
+    pub chunk_size: u32,
+    pub audio_format: u16,
     pub channels: u16,
     pub sample_rate: u32,
     pub byte_rate: u32,
@@ -112,8 +128,8 @@ impl FmtSubChunk {
 
 #[derive(Debug)]
 pub struct DataSubChunk {
-    chunk_id: String,
-    chunk_size: u32,
+    pub chunk_id: String,
+    pub chunk_size: u32,
 }
 
 impl DataSubChunk {
