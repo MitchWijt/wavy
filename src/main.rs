@@ -3,14 +3,13 @@ use crate::wav::Wav;
 
 mod player;
 mod wav;
+mod playback_state;
 
 #[derive(Debug)]
 struct ByteSample (u8, u8);
 
 fn main() {
     let wav = Wav::new("assets/track2.wav");
-    println!("{:?}", wav.data);
-    println!("{:?}", wav.fmt);
     let player = Player::new();
 
     player.play(wav);
