@@ -83,6 +83,14 @@ impl Player {
         Ok(())
     }
 
+    pub fn next(&self, wav: Wav) {
+        let player_state = PlayerState::from_wav(wav);
+        *self.state.lock().unwrap() = player_state;
+
+        let playback_duration = PlaybackDuration::new();
+        *self.playback_duration.lock().unwrap() = playback_duration;
+    }
+
 }
 
 pub struct PlayerState {

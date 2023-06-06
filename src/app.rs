@@ -6,6 +6,7 @@ use std::time::Duration;
 use termion::event::Key;
 use termion::input::TermRead;
 use crate::{Player, Terminal, Wav};
+use crate::playback_state::PlaybackDuration;
 use crate::player::PlayerState;
 
 pub struct App {
@@ -34,34 +35,22 @@ impl App {
 
             let mut song = Wav::new(song_path);
             let player = Player::new(song);
-            let playback_duration = player.playback_duration.clone();
 
             player.stream(next_song_tx.clone()).unwrap();
             current_song_index += 1;
 
             loop {
                 thread::sleep(Duration::from_secs(1));
-                let playback_duration = playback_duration.lock().unwrap();
 
+                let playback_duration = player.playback_duration.lock().unwrap();
                 terminal.lock().unwrap().clear();
                 terminal.lock().unwrap().write(playback_duration);
 
                 if let Ok(next_song) = next_song_rx.try_recv() {
                     if next_song {
-                        println!("NEXT");
                         let song_path = song_paths.get(current_song_index).unwrap();
                         let song = Wav::new(song_path);
-                        let player_state = PlayerState::from_wav(song);
-                        *player.state.lock().unwrap() = player_state;
-
-                        // player.next()
-                        // player.next()
-                        // player.next()
-
-                        // player.next() will grab the next song in queue and start playing that from
-                        // the same thread. Instead of spawning a new thread.
-                        // we do not need new threads for every song, because the old thread is obsolete anyways.
-                        // better to re-use it.
+                        player.next(song);
                     }
                 }
             }
