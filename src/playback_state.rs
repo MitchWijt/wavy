@@ -1,19 +1,5 @@
 use std::fmt::{Display, Formatter};
 
-pub struct PlaybackState {
-    pub playing: bool,
-    pub playback_duration: PlaybackDuration
-}
-
-impl PlaybackState {
-    pub fn new() -> Self {
-        PlaybackState {
-            playing: false,
-            playback_duration: PlaybackDuration::new()
-        }
-    }
-}
-
 pub struct PlaybackDuration {
     pub seconds: u32,
     pub minutes: u32,

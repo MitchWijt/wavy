@@ -1,6 +1,7 @@
 use std::cmp::min;
 use std::fmt::{Display, Formatter};
 use std::fs::File;
+use std::io;
 use std::io::{BufReader, Read};
 use std::path::Path;
 use std::ptr::write;
@@ -30,11 +31,11 @@ impl Wav {
         }
     }
 
-    pub fn read_buffer(&mut self, size: usize) -> Vec<u8> {
+    pub fn read_buffer(&mut self, size: usize) -> Result<Vec<u8>, io::Error> {
         let mut buffer = vec![0u8; size];
-        self.audio_data_reader.read_exact(&mut buffer).expect("Error when reading buffer");
+        self.audio_data_reader.read_exact(&mut buffer)?;
 
-        buffer
+        Ok(buffer)
     }
 }
 
