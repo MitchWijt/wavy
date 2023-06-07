@@ -5,8 +5,8 @@ use std::thread;
 use std::time::Duration;
 use termion::event::Key;
 use termion::input::TermRead;
-use crate::{Player, Terminal, Wav};
-use crate::playback_state::PlaybackDuration;
+use crate::{Player, ProgressBar, Terminal, Wav};
+use crate::playback_duration::PlaybackDuration;
 use crate::player::PlayerState;
 
 pub struct App {
@@ -17,41 +17,40 @@ pub struct App {
 impl App {
     pub fn new() -> Self {
         App {
-            song_paths: Arc::new(vec![String::from("assets/track.wav"), String::from("assets/track2.wav")]),
+            song_paths: Arc::new(vec![
+                String::from("assets/track.wav"),
+                String::from("assets/track2.wav"),
+                String::from("assets/wavy.wav"),
+            ]),
             terminal: Arc::new(Mutex::new(Terminal::new()))
         }
     }
 
     pub fn start(&self) -> Result<(), &'static str> {
-        let (next_song_tx, next_song_rx) = mpsc::channel();
-
         let terminal = self.terminal.clone();
         let song_paths = self.song_paths.clone();
+        let progress_bar = ProgressBar::new();
 
         thread::spawn(move || {
-            let mut current_song_index = 0;
+            let mut song_paths_iterator = song_paths.iter().peekable();
 
-            let song_path = song_paths.get(current_song_index).unwrap();
-
-            let mut song = Wav::new(song_path);
+            let song = Wav::new(song_paths_iterator.next().unwrap());
             let player = Player::new(song);
-
-            player.stream(next_song_tx.clone()).unwrap();
-            current_song_index += 1;
+            player.stream().unwrap();
 
             loop {
                 thread::sleep(Duration::from_secs(1));
 
-                let playback_duration = player.playback_duration.lock().unwrap();
                 terminal.lock().unwrap().clear();
-                terminal.lock().unwrap().write(playback_duration);
+                progress_bar.update(
+                    player.playback_duration.clone(),
+                    player.state.clone(),
+                    terminal.clone()
+                );
 
-                if let Ok(next_song) = next_song_rx.try_recv() {
-                    if next_song {
-                        let song_path = song_paths.get(current_song_index).unwrap();
-                        let song = Wav::new(song_path);
-                        player.next(song);
-                    }
+                if player.state.lock().unwrap().is_end {
+                    let song = Wav::new(song_paths_iterator.next().unwrap());
+                    player.next(song);
                 }
             }
         });

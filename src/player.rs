@@ -1,12 +1,13 @@
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Sender;
 use std::{io, thread};
+use std::os::macos::raw::stat;
 use std::process::exit;
 use std::time::Duration;
 use cpal::{Device, Host, OutputCallbackInfo, Sample, SampleRate, StreamConfig};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use simple_bytes::{Bytes, BytesRead};
-use crate::playback_state::{PlaybackDuration};
+use crate::playback_duration::{PlaybackDuration};
 use crate::Wav;
 
 pub struct Player {
@@ -23,7 +24,7 @@ impl Player {
             platform_settings: Arc::new(PlatformSettings::new())
         }
     }
-    pub fn stream(&self, next_song_tx: Sender<bool>) -> Result<(), &'static str> {
+    pub fn stream(&self) -> Result<(), &'static str> {
         let playback_duration = self.playback_duration.clone();
         let platform_settings = self.platform_settings.clone();
         let state = self.state.clone();
@@ -44,8 +45,7 @@ impl Player {
                                 },
                                 Err(e) => {
                                     if e.kind() == io::ErrorKind::UnexpectedEof {
-                                        next_song_tx.send(true).unwrap();
-                                        thread::sleep(Duration::from_millis(500));
+                                        state.is_end = true;
                                         break;
                                     }
                                 }
@@ -94,19 +94,21 @@ impl Player {
 }
 
 pub struct PlayerState {
-    wav: Wav,
+    pub wav: Wav,
+    pub is_end: bool,
     buffer: Vec<u8>,
     buffer_index: usize,
-    bytes_read: usize
+    bytes_read: usize,
 }
 
 impl PlayerState {
     pub fn from_wav(wav: Wav) -> Self {
         PlayerState {
-            wav: wav,
+            wav,
+            is_end: false,
             buffer: Vec::new(),
             buffer_index: 0,
-            bytes_read: 0
+            bytes_read: 0,
         }
     }
 }

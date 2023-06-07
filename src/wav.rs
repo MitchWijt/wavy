@@ -85,6 +85,19 @@ impl Display for WavDuration {
     }
 }
 
+impl Clone for WavDuration {
+    fn clone(&self) -> Self {
+        WavDuration {
+            raw_seconds: self.raw_seconds,
+            raw_minutes: self.raw_minutes,
+            seconds: self.seconds,
+            minutes: self.minutes
+        }
+    }
+}
+
+impl Copy for WavDuration {}
+
 pub struct WavHeader {
     pub riff: RiffChunk,
     pub fmt: FmtSubChunk,

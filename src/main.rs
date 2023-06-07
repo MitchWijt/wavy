@@ -16,7 +16,7 @@ use crate::terminal::Terminal;
 
 mod player;
 mod wav;
-mod playback_state;
+mod playback_duration;
 mod terminal;
 mod progress_bar;
 mod app;

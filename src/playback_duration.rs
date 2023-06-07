@@ -1,6 +1,7 @@
 use std::fmt::{Display, Formatter};
 
 pub struct PlaybackDuration {
+    pub raw_seconds: u32,
     pub seconds: u32,
     pub minutes: u32,
 }
@@ -8,12 +9,14 @@ pub struct PlaybackDuration {
 impl PlaybackDuration {
     pub fn new() -> Self {
         PlaybackDuration {
+            raw_seconds: 0,
             seconds: 0,
             minutes: 0,
         }
     }
 
     pub fn advance(&mut self) {
+        self.raw_seconds += 1;
         self.seconds += 1;
         if self.seconds == 60 {
             self.minutes += 1;
