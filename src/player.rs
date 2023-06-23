@@ -1,7 +1,10 @@
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Sender;
 use std::{io, thread};
+use std::collections::HashMap;
+use std::fs::read_dir;
 use std::os::macos::raw::stat;
+use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::time::Duration;
 use cpal::{Device, Host, OutputCallbackInfo, Sample, SampleRate, StreamConfig};
@@ -11,45 +14,42 @@ use crate::playback_duration::{PlaybackDuration};
 use crate::Wav;
 
 pub struct Player {
-    pub state: Arc<Mutex<PlayerState>>,
+    pub player_state: Arc<Mutex<PlayerState>>,
+    pub playback_state: Arc<Mutex<PlaybackState>>,
     pub playback_duration: Arc<Mutex<PlaybackDuration>>,
     platform_settings: Arc<PlatformSettings>
 }
 
 impl Player {
-    pub fn new(wav: Wav) -> Self {
+    pub fn new() -> Self {
         Player {
-            state: Arc::new(Mutex::new(PlayerState::from_wav(wav))),
+            player_state: Arc::new(Mutex::new(PlayerState::new())),
+            playback_state: Arc::new(Mutex::new(PlaybackState::new())),
             playback_duration: Arc::new(Mutex::new(PlaybackDuration::new())),
             platform_settings: Arc::new(PlatformSettings::new())
         }
     }
+
     pub fn stream(&self) -> Result<(), &'static str> {
         let playback_duration = self.playback_duration.clone();
         let platform_settings = self.platform_settings.clone();
-        let state = self.state.clone();
+        let playback_state = self.playback_state.clone();
+        let player_state = self.player_state.clone();
+
+        self.next();
 
         thread::spawn(move || {
             let stream = platform_settings.device.build_output_stream(
                 &platform_settings.config,
                 move | data: &mut [f32], _: &OutputCallbackInfo | {
-                    let buffer_size = data.len();
                     for sample in data.iter_mut() {
-                        let mut state = state.lock().unwrap();
+                        let mut state = playback_state.lock().unwrap();
+                        if state.buffer.len() == 0 {
+                            continue;
+                        }
 
-                        if state.bytes_read % buffer_size == 0 {
-                            match state.wav.read_buffer(buffer_size) {
-                                Ok(v) => {
-                                    state.buffer = v;
-                                    state.buffer_index = 0;
-                                },
-                                Err(e) => {
-                                    if e.kind() == io::ErrorKind::UnexpectedEof {
-                                        state.is_end = true;
-                                        break;
-                                    }
-                                }
-                            }
+                        if state.bytes_read >= state.buffer.len() {
+                            player_state.lock().unwrap().playlist_index += 1;
                         }
 
                         let byte_sample = &state.buffer[state.buffer_index..state.buffer_index + 2];
@@ -62,11 +62,11 @@ impl Player {
                         state.bytes_read += 2;
                         state.buffer_index += 2;
 
-                        let sample_rate = state.wav.header.fmt.sample_rate;
-                        let block_align = state.wav.header.fmt.block_align as u32;
+                        if state.bytes_read % state.bytes_per_ms == 0 {
+                            playback_duration.lock().unwrap().milliseconds += 1;
+                        }
 
-                        let bytes_per_second: usize = (sample_rate * block_align) as usize;
-                        if state.bytes_read % bytes_per_second == 0 {
+                        if state.bytes_read % state.bytes_per_s == 0 {
                             playback_duration.lock().unwrap().advance();
                         }
                     }
@@ -83,32 +83,65 @@ impl Player {
         Ok(())
     }
 
-    pub fn next(&self, wav: Wav) {
-        let player_state = PlayerState::from_wav(wav);
-        *self.state.lock().unwrap() = player_state;
-
+    pub fn next(&self) {
         let playback_duration = PlaybackDuration::new();
         *self.playback_duration.lock().unwrap() = playback_duration;
-    }
 
+        let playback_state = PlaybackState::new();
+        *self.playback_state.lock().unwrap() = playback_state;
+
+        let mut player_state_binding = self.player_state.lock().unwrap();
+        let playlist_index = player_state_binding.playlist_index;
+        let current_path = player_state_binding.playlist.get(playlist_index).unwrap();
+        let mut current_wav = Wav::new(current_path);
+
+        let sample_rate = current_wav.header.fmt.sample_rate;
+        let block_align = current_wav.header.fmt.block_align as u32;
+        let bytes_per_second: usize = (sample_rate * block_align) as usize;
+        let bytes_per_ms: usize = ((sample_rate * block_align) / 1000) as usize;
+
+        self.playback_state.lock().unwrap().buffer = current_wav.load_data().unwrap();
+        self.playback_state.lock().unwrap().bytes_per_s = bytes_per_second;
+        self.playback_state.lock().unwrap().bytes_per_ms = bytes_per_ms;
+        player_state_binding.active_song = current_wav;
+    }
 }
 
-pub struct PlayerState {
-    pub wav: Wav,
-    pub is_end: bool,
+pub struct PlaybackState {
     buffer: Vec<u8>,
     buffer_index: usize,
     bytes_read: usize,
+    bytes_per_s: usize,
+    bytes_per_ms: usize,
 }
 
-impl PlayerState {
-    pub fn from_wav(wav: Wav) -> Self {
-        PlayerState {
-            wav,
-            is_end: false,
+impl PlaybackState {
+    pub fn new() -> Self {
+        PlaybackState {
             buffer: Vec::new(),
             buffer_index: 0,
             bytes_read: 0,
+            bytes_per_s: 0,
+            bytes_per_ms: 0,
+        }
+    }
+}
+
+pub struct PlayerState {
+    pub playlist: Vec<PathBuf>,
+    pub active_song: Wav,
+    pub playlist_index: usize,
+}
+
+impl PlayerState {
+    pub fn new() -> Self {
+        let playlist: Vec<PathBuf> = read_dir("./assets").unwrap().map(|res| res.unwrap().path()).collect();
+        let active_song = Wav::new(playlist.get(0).unwrap().clone());
+
+        PlayerState {
+            playlist,
+            active_song,
+            playlist_index: 0
         }
     }
 }

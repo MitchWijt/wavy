@@ -17,7 +17,7 @@ impl ProgressBar {
 
     pub fn update(&self, playback_duration: Arc<Mutex<PlaybackDuration>>, player_state: Arc<Mutex<PlayerState>>, terminal: Arc<Mutex<Terminal>>) {
         let playback_duration = playback_duration.lock().unwrap();
-        let total_duration = player_state.lock().unwrap().wav.duration;
+        let total_duration = player_state.lock().unwrap().active_song.duration;
         let mut terminal = terminal.lock().unwrap();
 
         terminal.write(&playback_duration);
@@ -28,14 +28,14 @@ impl ProgressBar {
         terminal.set_cursor_left((self.max_ticks + 6.0) as u16);
 
         let ticks_per_second: f32 = self.max_ticks / total_duration.raw_seconds;
-        let seconds_per_tick: u32 = if ticks_per_second < 1.0 {
-            (1.0 / ticks_per_second).ceil()
+
+        let ms_per_tick: u32 = if ticks_per_second < 1.0 {
+            (1.0 / ticks_per_second) * 1000.0
         } else {
-            ticks_per_second.ceil()
+            ticks_per_second * 1000.0
         } as u32;
 
-        let extra = (self.max_ticks as u32) / (100 - ((total_duration.raw_seconds as u32) / seconds_per_tick));
-        let ticks = playback_duration.raw_seconds / (seconds_per_tick + extra);
+        let ticks = playback_duration.milliseconds / ms_per_tick;
         for _ in 0..ticks {
             terminal.write(String::from("#"));
         }
