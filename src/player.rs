@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, mpsc, Mutex};
 use std::sync::mpsc::Sender;
 use std::{io, thread};
 use std::collections::HashMap;
@@ -12,6 +12,11 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use simple_bytes::{Bytes, BytesRead};
 use crate::playback_duration::{PlaybackDuration};
 use crate::Wav;
+
+pub enum PlayerCommand {
+    NEXT,
+    PREVIOUS,
+}
 
 pub struct Player {
     pub player_state: Arc<Mutex<PlayerState>>,
@@ -77,6 +82,7 @@ impl Player {
             ).unwrap();
 
             stream.play().unwrap();
+
             loop {}
         });
 

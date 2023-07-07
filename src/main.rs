@@ -20,9 +20,10 @@ mod playback_duration;
 mod terminal;
 mod progress_bar;
 mod app;
+mod playlist;
 
 fn main() {
-    let app = App::new();
+    let app = App;
     match app.start() {
         Ok(..) => {},
         Err(e) => {
