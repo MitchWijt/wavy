@@ -25,8 +25,8 @@ impl Terminal {
 
     pub fn clear(&mut self) {
         self.cursor_col = 1;
-        self.cursor_col = 1;
-        write!(self.stdout, "{}{}",termion::cursor::Goto(1,1), termion::clear::CurrentLine).unwrap();
+        self.cursor_row = 1;
+        write!(self.stdout, "{}{}{}",termion::cursor::Goto(1,1), termion::clear::BeforeCursor, termion::cursor::Hide).unwrap();
         self.stdout.flush().unwrap();
     }
 
@@ -55,7 +55,7 @@ impl Terminal {
     }
 
     pub fn set_cursor(&mut self) {
-        write!(self.stdout, "{}", termion::cursor::Goto(self.cursor_row, self.cursor_col)).unwrap();
+        write!(self.stdout, "{}", termion::cursor::Goto(self.cursor_col, self.cursor_row)).unwrap();
         self.stdout.flush().unwrap();
     }
 }

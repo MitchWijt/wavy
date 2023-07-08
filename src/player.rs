@@ -19,18 +19,12 @@ pub enum PlayerCommand {
 }
 
 pub struct Player {
-    pub player_state: Arc<Mutex<PlayerState>>,
-    pub playback_state: Arc<Mutex<PlaybackState>>,
-    pub playback_duration: Arc<Mutex<PlaybackDuration>>,
     platform_settings: Arc<PlatformSettings>
 }
 
 impl Player {
     pub fn new() -> Self {
         Player {
-            player_state: Arc::new(Mutex::new(PlayerState::new())),
-            playback_state: Arc::new(Mutex::new(PlaybackState::new())),
-            playback_duration: Arc::new(Mutex::new(PlaybackDuration::new())),
             platform_settings: Arc::new(PlatformSettings::new())
         }
     }
@@ -129,25 +123,6 @@ impl PlaybackState {
             bytes_read: 0,
             bytes_per_s: 0,
             bytes_per_ms: 0,
-        }
-    }
-}
-
-pub struct PlayerState {
-    pub playlist: Vec<PathBuf>,
-    pub active_song: Wav,
-    pub playlist_index: usize,
-}
-
-impl PlayerState {
-    pub fn new() -> Self {
-        let playlist: Vec<PathBuf> = read_dir("./assets").unwrap().map(|res| res.unwrap().path()).collect();
-        let active_song = Wav::new(playlist.get(0).unwrap().clone());
-
-        PlayerState {
-            playlist,
-            active_song,
-            playlist_index: 0
         }
     }
 }

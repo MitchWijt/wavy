@@ -2,14 +2,21 @@ use std::fs::{File, read_dir};
 use std::path::PathBuf;
 use crate::wav::Wav;
 
-pub struct Playlist(pub(crate) Vec<Song>);
+pub struct Playlist {
+    pub songs: Vec<Song>
+}
 
 impl Playlist {
     pub fn new() -> Self {
         let mut songs: Vec<Song> = Vec::new();
 
-        let playlist: Vec<PathBuf> = read_dir("./playlist").unwrap().filter(|res| res.as_ref().unwrap().file_name().to_str().unwrap().contains(".wav")).map(|res| res.unwrap().path()).collect();
-        for path in playlist {
+        let song_paths: Vec<PathBuf> = read_dir("./playlist")
+            .unwrap()
+            .filter(|res| res.as_ref().unwrap().file_name().to_str().unwrap().contains(".wav"))
+            .map(|res| res.unwrap().path())
+            .collect();
+
+        for path in song_paths {
             let file_name = path.file_name().unwrap().to_str().unwrap();
             let splitted_file_name: Vec<&str> = file_name.split("-").collect();
 
@@ -24,7 +31,9 @@ impl Playlist {
             })
         }
 
-        return Playlist(songs);
+        return Playlist {
+            songs
+        }
     }
 }
 
