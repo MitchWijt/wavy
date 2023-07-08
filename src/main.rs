@@ -1,4 +1,6 @@
-use std::io::{stdin, stdout};
+use std::fmt::format;
+use std::fs::File;
+use std::io::{BufReader, stdin, stdout};
 use std::thread;
 use std::thread::Thread;
 use std::time::Duration;
@@ -8,9 +10,14 @@ use termion::screen::{AlternateScreen, IntoAlternateScreen};
 use crate::player::Player;
 use crate::wav::Wav;
 use std::io::Write;
+use std::path::PathBuf;
 use std::process::exit;
+use std::sync::{Arc, Mutex};
+use crossbeam_queue::SegQueue;
 use termion::event::Key;
-use crate::app::App;
+use crate::gui::Gui;
+use crate::output::Output;
+use crate::playlist::Playlist;
 use crate::progress_bar::ProgressBar;
 use crate::terminal::Terminal;
 
@@ -19,15 +26,27 @@ mod wav;
 mod playback_duration;
 mod terminal;
 mod progress_bar;
-mod app;
+mod playlist;
+mod gui;
+mod output;
+
+pub enum Commands {
+    PLAY {
+        buffer: Vec<u8>
+    },
+    PLAYRESUME,
+    PAUSE,
+    SELECT,
+    FORWARD,
+    BACKWARDS
+}
 
 fn main() {
-    let app = App::new();
-    match app.start() {
-        Ok(..) => {},
-        Err(e) => {
-            eprintln!("{}", e);
-            exit(1);
-        }
-    }
+    let gui = Gui::new();
+
+    let from_gui_queue = Arc::new(SegQueue::new());
+    let to_gui_queue = Arc::new(SegQueue::new());
+
+    let _stream = Output::new(from_gui_queue.clone(), to_gui_queue.clone());
+    gui.draw(from_gui_queue);
 }

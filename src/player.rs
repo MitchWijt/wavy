@@ -1,139 +1,94 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, mpsc, Mutex};
 use std::sync::mpsc::Sender;
 use std::{io, thread};
+use std::collections::HashMap;
+use std::fs::{File, read_dir};
+use std::io::{BufReader, Read};
 use std::os::macos::raw::stat;
+use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::time::Duration;
 use cpal::{Device, Host, OutputCallbackInfo, Sample, SampleRate, StreamConfig};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use crossbeam_queue::SegQueue;
 use simple_bytes::{Bytes, BytesRead};
 use crate::playback_duration::{PlaybackDuration};
-use crate::Wav;
+use crate::{Commands, Wav};
+
 
 pub struct Player {
-    pub state: Arc<Mutex<PlayerState>>,
-    pub playback_duration: Arc<Mutex<PlaybackDuration>>,
-    platform_settings: Arc<PlatformSettings>
+    buffer_index: usize,
+    bytes_read: usize,
+    buffer: Option<Vec<u8>>,
+    playback_state: PlaybackState,
+    from_gui_queue: Arc<SegQueue<Commands>>,
+    to_gui_queue: Arc<SegQueue<Commands>>
 }
 
 impl Player {
-    pub fn new(wav: Wav) -> Self {
+    pub fn new(from_gui_queue: Arc<SegQueue<Commands>>, to_gui_queue: Arc<SegQueue<Commands>>) -> Self {
         Player {
-            state: Arc::new(Mutex::new(PlayerState::from_wav(wav))),
-            playback_duration: Arc::new(Mutex::new(PlaybackDuration::new())),
-            platform_settings: Arc::new(PlatformSettings::new())
-        }
-    }
-    pub fn stream(&self) -> Result<(), &'static str> {
-        let playback_duration = self.playback_duration.clone();
-        let platform_settings = self.platform_settings.clone();
-        let state = self.state.clone();
-
-        thread::spawn(move || {
-            let stream = platform_settings.device.build_output_stream(
-                &platform_settings.config,
-                move | data: &mut [f32], _: &OutputCallbackInfo | {
-                    let buffer_size = data.len();
-                    for sample in data.iter_mut() {
-                        let mut state = state.lock().unwrap();
-
-                        if state.bytes_read % buffer_size == 0 {
-                            match state.wav.read_buffer(buffer_size) {
-                                Ok(v) => {
-                                    state.buffer = v;
-                                    state.buffer_index = 0;
-                                },
-                                Err(e) => {
-                                    if e.kind() == io::ErrorKind::UnexpectedEof {
-                                        state.is_end = true;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-
-                        let byte_sample = &state.buffer[state.buffer_index..state.buffer_index + 2];
-
-                        let mut bytes: Bytes = byte_sample.into();
-                        let sample_value = bytes.read_le_i16();
-
-                        *sample = Sample::from(&sample_value);
-
-                        state.bytes_read += 2;
-                        state.buffer_index += 2;
-
-                        let sample_rate = state.wav.header.fmt.sample_rate;
-                        let block_align = state.wav.header.fmt.block_align as u32;
-
-                        let bytes_per_second: usize = (sample_rate * block_align) as usize;
-                        if state.bytes_read % bytes_per_second == 0 {
-                            playback_duration.lock().unwrap().advance();
-                        }
-                    }
-                },
-                move | err | {
-                    eprintln!("{}", err);
-                }
-            ).unwrap();
-
-            stream.play().unwrap();
-            loop {}
-        });
-
-        Ok(())
-    }
-
-    pub fn next(&self, wav: Wav) {
-        let player_state = PlayerState::from_wav(wav);
-        *self.state.lock().unwrap() = player_state;
-
-        let playback_duration = PlaybackDuration::new();
-        *self.playback_duration.lock().unwrap() = playback_duration;
-    }
-
-}
-
-pub struct PlayerState {
-    pub wav: Wav,
-    pub is_end: bool,
-    buffer: Vec<u8>,
-    buffer_index: usize,
-    bytes_read: usize,
-}
-
-impl PlayerState {
-    pub fn from_wav(wav: Wav) -> Self {
-        PlayerState {
-            wav,
-            is_end: false,
-            buffer: Vec::new(),
+            buffer: None,
             buffer_index: 0,
             bytes_read: 0,
+            playback_state: PlaybackState::Paused,
+            from_gui_queue,
+            to_gui_queue
+        }
+    }
+
+    pub fn process(&mut self, data: &mut [f32]) {
+        while let Some(command) = self.from_gui_queue.pop() {
+            match command {
+                Commands::PLAY {
+                    buffer
+                } => {
+                    self.playback_state = PlaybackState::Playing;
+                    self.buffer = Some(buffer);
+                    self.buffer_index = 0;
+                    self.bytes_read = 0;
+                },
+                Commands::PAUSE => {
+                    self.playback_state = PlaybackState::Paused;
+                },
+                Commands::PLAYRESUME => {
+                    self.playback_state = PlaybackState::Playing;
+                },
+                _ => {}
+            }
+        }
+
+        if self.playback_state == PlaybackState::Paused {
+            silence(data);
+            return;
+        }
+
+        if self.buffer.is_none() {
+            silence(data);
+            return;
+        }
+
+        for sample in data.iter_mut() {
+            let sample_bytes = &self.buffer.as_ref().unwrap()[self.buffer_index..self.buffer_index + 2];
+            let mut bytes: Bytes = sample_bytes.into();
+            let sample_value = bytes.read_le_i16();
+
+            *sample = Sample::from(&sample_value);
+
+            self.bytes_read += 2;
+            self.buffer_index += 2;
         }
     }
 }
 
-struct PlatformSettings {
-    device: Device,
-    config: StreamConfig
+pub fn silence(data: &mut [f32]) {
+    for sample in data.iter_mut() {
+        *sample = 0.0;
+    }
 }
 
-impl PlatformSettings {
-    pub fn new() -> Self {
-        let host = cpal::default_host();
-        let device = host.default_output_device().expect("No default output device was found");
-
-        let mut supported_configs_range = device.supported_output_configs().expect("error while querying configs");
-        let supported_config = supported_configs_range
-            .find(|d| d.max_sample_rate() == SampleRate(44100))
-            .expect("No config with correct sample rate found")
-            .with_max_sample_rate();
-
-        let output_config = StreamConfig::from(supported_config);
-
-        PlatformSettings {
-            device,
-            config: output_config,
-        }
-    }
+#[derive(PartialEq)]
+enum PlaybackState {
+    Paused,
+    Playing
 }

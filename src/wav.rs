@@ -2,7 +2,7 @@ use std::cmp::min;
 use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io;
-use std::io::{BufReader, Read};
+use std::io::{BufReader, Read, Seek};
 use std::path::Path;
 use std::ptr::write;
 use std::time::Duration;
@@ -10,7 +10,7 @@ use std::time::Duration;
 pub struct Wav {
     pub header: WavHeader,
     pub duration: WavDuration,
-    audio_data_reader: BufReader<File>
+    pub audio_data_reader: BufReader<File>,
 }
 
 impl Wav {
@@ -31,6 +31,14 @@ impl Wav {
         }
     }
 
+    pub fn load_data(&mut self) -> Result<Vec<u8>, io::Error> {
+        let chunk_size = self.header.data.chunk_size as usize;
+        let mut buffer = vec![0u8; chunk_size];
+        self.audio_data_reader.read_exact(&mut buffer)?;
+
+        Ok(buffer)
+    }
+
     pub fn read_buffer(&mut self, size: usize) -> Result<Vec<u8>, io::Error> {
         let mut buffer = vec![0u8; size];
         self.audio_data_reader.read_exact(&mut buffer)?;
@@ -43,7 +51,8 @@ pub struct WavDuration {
     pub raw_seconds: f32,
     pub seconds: f32,
     pub raw_minutes: f32,
-    pub minutes: f32
+    pub minutes: f32,
+    pub milliseconds: f32,
 }
 
 impl WavDuration {
@@ -62,7 +71,8 @@ impl WavDuration {
             raw_seconds,
             seconds,
             raw_minutes,
-            minutes
+            minutes,
+            milliseconds: seconds * 1000.0
         }
     }
 }
@@ -91,7 +101,8 @@ impl Clone for WavDuration {
             raw_seconds: self.raw_seconds,
             raw_minutes: self.raw_minutes,
             seconds: self.seconds,
-            minutes: self.minutes
+            minutes: self.minutes,
+            milliseconds: self.milliseconds
         }
     }
 }
