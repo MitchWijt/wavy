@@ -2,7 +2,7 @@ use std::cmp::min;
 use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io;
-use std::io::{BufReader, Read};
+use std::io::{BufReader, Read, Seek};
 use std::path::Path;
 use std::ptr::write;
 use std::time::Duration;
@@ -10,7 +10,7 @@ use std::time::Duration;
 pub struct Wav {
     pub header: WavHeader,
     pub duration: WavDuration,
-    audio_data_reader: BufReader<File>
+    pub audio_data_reader: BufReader<File>,
 }
 
 impl Wav {

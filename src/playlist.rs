@@ -1,5 +1,5 @@
 use std::fs::{File, read_dir};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use crate::wav::Wav;
 
 pub struct Playlist {
@@ -24,10 +24,12 @@ impl Playlist {
             let title = String::from(*splitted_file_name.get(1).unwrap()).replace(".wav", "");
 
             songs.push(Song {
+                path: PathBuf::from(&path),
                 wav: Wav::new(path),
                 artist,
                 title,
-                playing: false
+                playing: false,
+
             })
         }
 
@@ -41,5 +43,6 @@ pub struct Song {
     pub wav: Wav,
     pub artist: String,
     pub title: String,
-    pub playing: bool
+    pub playing: bool,
+    pub path: PathBuf
 }
