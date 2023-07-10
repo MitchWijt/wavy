@@ -19,6 +19,7 @@ TODO: These are some notes of some things that really need to change.
       3. In order to handle commands from the Player to the GUI. We need some sort of a callback mechanism in the GUI to start handling these commands.
          Since we cannot handle them in the spawned thread.
       4. Maybe index can also be it's own struct of some sorts.
+      5. I need to handle the overflowing or underflowing of the index and circle back to either the start(overflow) or end(underflow)
 
  */
 
