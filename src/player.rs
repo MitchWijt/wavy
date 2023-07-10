@@ -14,6 +14,7 @@ use crossbeam_queue::SegQueue;
 use simple_bytes::{Bytes, BytesRead};
 use crate::playback_duration::{PlaybackDuration};
 use crate::{Commands, Wav};
+use crate::Commands::END_SONG;
 
 
 pub struct Player {
@@ -69,7 +70,13 @@ impl Player {
         }
 
         for sample in data.iter_mut() {
-            let sample_bytes = &self.buffer.as_ref().unwrap()[self.buffer_index..self.buffer_index + 2];
+            let buffer = &self.buffer.as_ref().unwrap();
+            if self.buffer_index + 1 > buffer.len() {
+                self.to_gui_queue.push(END_SONG);
+                self.buffer = None;
+                return;
+            }
+            let sample_bytes = &buffer[self.buffer_index..self.buffer_index + 2];
             let mut bytes: Bytes = sample_bytes.into();
             let sample_value = bytes.read_le_i16();
 

@@ -29,11 +29,13 @@ mod progress_bar;
 mod playlist;
 mod gui;
 mod output;
+mod buf_loader;
 
 pub enum Commands {
     PLAY {
         buffer: Vec<u8>
     },
+    END_SONG,
     PLAYRESUME,
     PAUSE,
     SELECT,
@@ -42,7 +44,7 @@ pub enum Commands {
 }
 
 fn main() {
-    let gui = Gui::new();
+    let mut gui = Gui::new();
 
     let from_gui_queue = Arc::new(SegQueue::new());
     let to_gui_queue = Arc::new(SegQueue::new());
