@@ -1,14 +1,16 @@
-use std::fs::File;
+use std::fs::{File};
 use std::io::{BufReader, Read, Seek, SeekFrom, stdin};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 use std::time::Duration;
 use crossbeam_queue::SegQueue;
-use termion::event::Key;
+use crossterm::event::{KeyEvent, read, KeyCode, KeyModifiers};
+use termion::event::{Key};
 use termion::input::TermRead;
 use crate::{Commands, Playlist, Terminal};
+use crate::app::Event;
+use crate::app::Event::{Continue, Exit};
 use crate::Commands::{PAUSE, PLAY, PLAYRESUME, END_SONG};
-use crate::gui::Commands::SELECT;
 use crate::playlist::Song;
 
 /*
@@ -24,116 +26,106 @@ TODO: These are some notes of some things that really need to change.
  */
 
 pub struct Gui {
-    playlist: Arc<Playlist>,
-    active_song: Arc<Mutex<u16>>,
-    pre_loaded_buffer: Option<Vec<u8>>
+    to_gui_queue: Arc<SegQueue<Commands>>,
+    from_gui_queue: Arc<SegQueue<Commands>>,
+    playlist: Playlist,
+    playlist_index: usize,
+    terminal: Terminal,
 }
 
 impl Gui {
-    pub fn new() -> Self {
+    pub fn new(from_gui_queue: Arc<SegQueue<Commands>>, to_gui_queue: Arc<SegQueue<Commands>>) -> Self {
         Gui {
-            playlist: Arc::new(Playlist::new()),
-            active_song: Arc::new(Mutex::new(0)),
-            pre_loaded_buffer: None
+            to_gui_queue,
+            from_gui_queue,
+            playlist: Playlist::new(),
+            playlist_index: 0,
+            terminal: Terminal::new()
         }
     }
 
-    pub fn draw(&mut self, from_gui_queue: Arc<SegQueue<Commands>>) {
-        let mut terminal = Terminal::new();
-        let playlist = self.playlist.clone();
-        let index = self.active_song.clone();
+    pub fn draw(&mut self) {
+        // to_gui_commands
+        let songs = &self.playlist.songs;
 
-        thread::spawn(move || {
-            loop {
-                thread::sleep(Duration::from_secs(1));
-                let songs = &playlist.songs;
+        self.terminal.clear();
+        for song in songs {
+            self.terminal.write(format!("{} - {}", song.title, song.artist));
 
-                terminal.clear();
-                for song in songs {
-                    // check if active song. If it is, we format it differently
-                    terminal.write(format!("{} - {}", song.title, song.artist));
+            self.terminal.cursor_row += 1;
+            self.terminal.cursor_col = 1;
+            self.terminal.set_cursor();
+        }
+    }
 
-                    terminal.cursor_row += 1;
-                    terminal.cursor_col = 1;
-                    terminal.set_cursor();
-                }
-
-                let index = index.lock().unwrap();
-                terminal.write(format!("{index}"));
-            }
-        });
-
+    pub fn handle_key_events(&mut self) -> Option<Event> {
         for key in stdin().keys() {
             match key.unwrap() {
                 Key::Char('q') => {
-                    break;
+                    return Some(Exit)
                 }
                 Key::Char(' ') => {
-                    let song_index = self.get_current_index();
-                    let buffer = self.get_buffer(song_index);
-                    from_gui_queue.push(PLAY {
+                    let buffer = self.load_buffer(self.playlist_index);
+                    self.from_gui_queue.push(PLAY {
                         buffer
                     });
-
-                    let next_song_index = self.get_next_index();
-                    self.pre_load_buffer(next_song_index);
+                    return Some(Continue)
                 }
                 Key::Char('p') => {
-                    from_gui_queue.push(PAUSE);
+                    self.from_gui_queue.push(PAUSE);
+                    return Some(Continue)
                 }
                 Key::Char('n') => {
-                    from_gui_queue.push(PLAYRESUME);
+                    self.from_gui_queue.push(PLAYRESUME);
+                    return Some(Continue)
                 }
                 Key::Ctrl(key) => {
-                    match key {
+                    return match key {
                         // next song
                         'n' => {
-                            *self.active_song.lock().unwrap() += 1;
+                            self.playlist_index += 1;
 
-                            let song_index = self.get_current_index();
-                            let buffer = self.get_buffer(song_index);
-                            from_gui_queue.push(PLAY {
+                            let buffer = self.load_buffer(self.playlist_index);
+                            self.from_gui_queue.push(PLAY {
                                 buffer
                             });
-
-                            // todo: only pre-load next song if there is a next song
-                            // todo: this needs to be handled by a separate module
-                            // let next_song_index = self.get_next_index();
-                            // self.pre_load_buffer(next_song_index);
+                            return Some(Continue)
                         },
                         // previous song
                         'p' => {
-                            *self.active_song.lock().unwrap() -= 1;
+                            self.playlist_index -= 1;
 
-                            let song_index = self.get_current_index();
-                            let buffer = self.get_buffer(song_index);
-                            from_gui_queue.push(PLAY {
+                            let buffer = self.load_buffer(self.playlist_index);
+                            self.from_gui_queue.push(PLAY {
                                 buffer
                             });
+                            return Some(Continue)
                         },
-                        _ => {}
+                        _ => return Some(Continue)
                     }
                 },
-                _ => {}
+                _ => return Some(Continue)
             }
-        };
-    }
-
-    pub fn get_buffer(&mut self, index: u16) -> Vec<u8> {
-        return match &self.pre_loaded_buffer {
-            // make sure this does not clone the data since it's a very expensive allocation
-            Some(buffer) => {
-                let pre_loaded_buffer = buffer.clone();
-                self.pre_loaded_buffer = None;
-
-                pre_loaded_buffer
-            },
-            None => self.load_buffer(index)
         }
+
+        return Some(Continue)
     }
 
-    pub fn load_buffer(&self, index: u16) -> Vec<u8> {
-        let song: &Song = self.playlist.songs.get(index as usize).unwrap();
+    // pub fn get_buffer(&mut self, index: u16) -> Vec<u8> {
+    //     return match &self.pre_loaded_buffer {
+    //         // make sure this does not clone the data since it's a very expensive allocation
+    //         Some(buffer) => {
+    //             let pre_loaded_buffer = buffer.clone();
+    //             self.pre_loaded_buffer = None;
+    //
+    //             pre_loaded_buffer
+    //         },
+    //         None => self.load_buffer(index)
+    //     }
+    // }
+
+    pub fn load_buffer(&self, playlist_index: usize) -> Vec<u8> {
+        let song: &Song = self.playlist.songs.get(playlist_index).unwrap();
         let file = File::open(&song.path).unwrap();
 
         let mut reader = BufReader::new(file);
@@ -147,21 +139,7 @@ impl Gui {
         buffer
     }
 
-    pub fn pre_load_buffer(&mut self, index: u16) {
-        self.pre_loaded_buffer = Some(self.load_buffer(index));
-    }
-
-    pub fn get_current_index(&self) -> u16 {
-        *self.active_song.lock().unwrap()
-    }
-
-    pub fn get_next_index(&self) -> u16 {
-        // this can return something different if the state is set to shuffle
-        let current_index = *self.active_song.lock().unwrap();
-        let next_index = current_index + 1;
-
-        next_index
-    }
-
-
+    // pub fn pre_load_buffer(&mut self, index: u16) {
+    //     self.pre_loaded_buffer = Some(self.load_buffer(index));
+    // }
 }

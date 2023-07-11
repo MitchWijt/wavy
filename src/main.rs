@@ -15,6 +15,7 @@ use std::process::exit;
 use std::sync::{Arc, Mutex};
 use crossbeam_queue::SegQueue;
 use termion::event::Key;
+use crate::app::App;
 use crate::gui::Gui;
 use crate::output::Output;
 use crate::playlist::Playlist;
@@ -29,7 +30,7 @@ mod progress_bar;
 mod playlist;
 mod gui;
 mod output;
-mod buf_loader;
+mod app;
 
 pub enum Commands {
     PLAY {
@@ -38,17 +39,14 @@ pub enum Commands {
     END_SONG,
     PLAYRESUME,
     PAUSE,
-    SELECT,
     FORWARD,
     BACKWARDS
 }
 
 fn main() {
-    let mut gui = Gui::new();
-
     let from_gui_queue = Arc::new(SegQueue::new());
     let to_gui_queue = Arc::new(SegQueue::new());
 
     let _stream = Output::new(from_gui_queue.clone(), to_gui_queue.clone());
-    gui.draw(from_gui_queue);
+    let _app = App::new(from_gui_queue.clone(), to_gui_queue.clone());
 }

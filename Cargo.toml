@@ -8,5 +8,6 @@ edition = "2021"
 [dependencies]
 cpal = "0.13.0"
 crossbeam-queue = "0.3.8"
+crossterm = "0.26.1"
 simple-bytes = "0.2.11"
 termion = "2.0.1"

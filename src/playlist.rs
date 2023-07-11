@@ -27,9 +27,7 @@ impl Playlist {
                 path: PathBuf::from(&path),
                 wav: Wav::new(path),
                 artist,
-                title,
-                playing: false,
-
+                title
             })
         }
 
@@ -43,6 +41,5 @@ pub struct Song {
     pub wav: Wav,
     pub artist: String,
     pub title: String,
-    pub playing: bool,
     pub path: PathBuf
 }

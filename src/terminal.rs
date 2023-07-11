@@ -1,18 +1,24 @@
 use std::fmt::Display;
 use std::io::{Stdout, stdout, Write};
-use termion::raw::{IntoRawMode, RawTerminal};
-use termion::screen::{AlternateScreen, IntoAlternateScreen};
+use std::ptr::write;
+use crossterm::execute;
+use crossterm::terminal::{enable_raw_mode, EnterAlternateScreen};
+
 
 pub struct Terminal {
-    stdout: AlternateScreen<RawTerminal<Stdout>>,
+    stdout: Stdout,
     pub cursor_row: u16,
     pub cursor_col: u16
 }
 
 impl Terminal {
     pub fn new() -> Self {
+        let mut stdout = stdout();
+        enable_raw_mode().unwrap();
+        execute!(stdout, EnterAlternateScreen);
+
         Terminal {
-            stdout: stdout().into_raw_mode().unwrap().into_alternate_screen().unwrap(),
+            stdout,
             cursor_row: 0,
             cursor_col: 0,
         }
