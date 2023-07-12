@@ -32,15 +32,20 @@ mod gui;
 mod output;
 mod app;
 
-pub enum Commands {
-    PLAY {
+pub enum GuiToPlayerCommands {
+    Play {
         buffer: Vec<u8>
     },
-    END_SONG,
-    PLAYRESUME,
-    PAUSE,
-    FORWARD,
-    BACKWARDS
+    PlayResume,
+    Pause,
+    Forward,
+    Rewind
+}
+
+pub enum PlayerToGuiCommands {
+    End,
+    Playing,
+    Paused
 }
 
 fn main() {

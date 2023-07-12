@@ -1,6 +1,7 @@
 use std::fmt::Display;
 use std::io::{Stdout, stdout, Write};
 use std::ptr::write;
+use crossterm::event::{KeyboardEnhancementFlags, PushKeyboardEnhancementFlags};
 use crossterm::execute;
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen};
 use termion::raw::{IntoRawMode, RawTerminal};

@@ -2,12 +2,12 @@ use std::sync::Arc;
 use cpal::{Device, OutputCallbackInfo, SampleRate, Stream, StreamConfig};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use crossbeam_queue::SegQueue;
-use crate::{Commands, Player};
+use crate::{GuiToPlayerCommands, Player, PlayerToGuiCommands};
 
 pub struct Output;
 
 impl Output {
-    pub fn new(from_gui_queue: Arc<SegQueue<Commands>>, to_gui_queue: Arc<SegQueue<Commands>>) -> Stream {
+    pub fn new(from_gui_queue: Arc<SegQueue<GuiToPlayerCommands>>, to_gui_queue: Arc<SegQueue<PlayerToGuiCommands>>) -> Stream {
         let platform_settings = PlatformSettings::new();
         let mut player = Player::new(from_gui_queue, to_gui_queue);
 
