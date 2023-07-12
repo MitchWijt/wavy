@@ -4,33 +4,22 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 use std::time::Duration;
 use crossbeam_queue::SegQueue;
-use crossterm::event::{KeyEvent, read, KeyCode, KeyModifiers};
-use termion::event::{Key};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use crossterm::terminal::disable_raw_mode;
+use termion::async_stdin;
+use termion::event::Key;
 use termion::input::TermRead;
 use crate::{Commands, Playlist, Terminal};
-use crate::app::Event;
-use crate::app::Event::{Continue, Exit};
+use crate::app::{App, AppEvent};
 use crate::Commands::{PAUSE, PLAY, PLAYRESUME, END_SONG};
 use crate::playlist::Song;
-
-/*
-TODO: These are some notes of some things that really need to change.
-      1. I feel that pre_loaded_buffer and the whole get_buffer mechanism should not be part of the GUI. The GUI should draw the GUI and handle
-         GUI commands, that's it.
-      2. Maybe something needs to change with the playlist and the active_song_index they seem kind of out of place.
-      3. In order to handle commands from the Player to the GUI. We need some sort of a callback mechanism in the GUI to start handling these commands.
-         Since we cannot handle them in the spawned thread.
-      4. Maybe index can also be it's own struct of some sorts.
-      5. I need to handle the overflowing or underflowing of the index and circle back to either the start(overflow) or end(underflow)
-
- */
 
 pub struct Gui {
     to_gui_queue: Arc<SegQueue<Commands>>,
     from_gui_queue: Arc<SegQueue<Commands>>,
     playlist: Playlist,
     playlist_index: usize,
-    terminal: Terminal,
+    terminal: Terminal
 }
 
 impl Gui {
@@ -45,70 +34,101 @@ impl Gui {
     }
 
     pub fn draw(&mut self) {
-        // to_gui_commands
+        while let Some(command) = self.to_gui_queue.pop() {
+            match command {
+                END_SONG => {
+                    self.playlist_index += 1;
+
+                    let buffer = self.load_buffer(self.playlist_index);
+                    self.from_gui_queue.push(PLAY {
+                        buffer
+                    });
+                }
+                _ => {}
+            }
+        }
+
         let songs = &self.playlist.songs;
+        let active_song = self.playlist.songs.get(self.playlist_index).unwrap();
 
         self.terminal.clear();
         for song in songs {
-            self.terminal.write(format!("{} - {}", song.title, song.artist));
+            self.terminal.write(song);
 
             self.terminal.cursor_row += 1;
             self.terminal.cursor_col = 1;
             self.terminal.set_cursor();
         }
+
+        self.terminal.cursor_row += 2;
+        self.terminal.cursor_col = 1;
+        self.terminal.set_cursor();
+        self.terminal.clear_line();
+        self.terminal.write(active_song)
     }
 
-    pub fn handle_key_events(&mut self) -> Option<Event> {
-        for key in stdin().keys() {
-            match key.unwrap() {
-                Key::Char('q') => {
-                    return Some(Exit)
-                }
-                Key::Char(' ') => {
-                    let buffer = self.load_buffer(self.playlist_index);
-                    self.from_gui_queue.push(PLAY {
-                        buffer
-                    });
-                    return Some(Continue)
-                }
-                Key::Char('p') => {
-                    self.from_gui_queue.push(PAUSE);
-                    return Some(Continue)
-                }
-                Key::Char('n') => {
-                    self.from_gui_queue.push(PLAYRESUME);
-                    return Some(Continue)
-                }
-                Key::Ctrl(key) => {
-                    return match key {
-                        // next song
-                        'n' => {
-                            self.playlist_index += 1;
-
-                            let buffer = self.load_buffer(self.playlist_index);
-                            self.from_gui_queue.push(PLAY {
-                                buffer
-                            });
-                            return Some(Continue)
-                        },
-                        // previous song
-                        'p' => {
-                            self.playlist_index -= 1;
-
-                            let buffer = self.load_buffer(self.playlist_index);
-                            self.from_gui_queue.push(PLAY {
-                                buffer
-                            });
-                            return Some(Continue)
-                        },
-                        _ => return Some(Continue)
-                    }
-                },
-                _ => return Some(Continue)
+    pub fn handle_key_event(&mut self, event: KeyEvent) -> Option<AppEvent> {
+        match event {
+            KeyEvent {
+                code: KeyCode::Char('q'),
+                modifiers: KeyModifiers::NONE,
+                ..
+            } => Some(AppEvent::Exit),
+            KeyEvent {
+                code: KeyCode::Char(' '),
+                modifiers: KeyModifiers::NONE,
+                ..
+            } => {
+                let buffer = self.load_buffer(self.playlist_index);
+                self.from_gui_queue.push(PLAY {
+                    buffer
+                });
+                Some(AppEvent::Continue)
             }
-        }
+            KeyEvent {
+                code: KeyCode::Char('p'),
+                modifiers: KeyModifiers::NONE,
+                ..
+            } => {
+                self.from_gui_queue.push(PAUSE);
+                Some(AppEvent::Continue)
+            }
+            KeyEvent {
+                code: KeyCode::Char('n'),
+                modifiers: KeyModifiers::NONE,
+                ..
+            } => {
+                self.from_gui_queue.push(PLAYRESUME);
+                Some(AppEvent::Continue)
+            }
+            KeyEvent {
+                code: KeyCode::Char('n'),
+                modifiers: KeyModifiers::CONTROL,
+                ..
+            } => {
+                self.playlist_index += 1;
 
-        return Some(Continue)
+                let buffer = self.load_buffer(self.playlist_index);
+                self.from_gui_queue.push(PLAY {
+                    buffer
+                });
+                Some(AppEvent::Continue)
+            }
+            KeyEvent {
+                code: KeyCode::Char('p'),
+                modifiers: KeyModifiers::CONTROL,
+                ..
+            } => {
+                self.playlist_index -= 1;
+
+                let buffer = self.load_buffer(self.playlist_index);
+                self.from_gui_queue.push(PLAY {
+                    buffer
+                });
+                Some(AppEvent::Continue)
+            }
+            _ => Some(AppEvent::Continue)
+        }
     }
 
     // pub fn get_buffer(&mut self, index: u16) -> Vec<u8> {

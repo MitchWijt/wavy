@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use std::fs::{File, read_dir};
 use std::path::{Path, PathBuf};
 use crate::wav::Wav;
@@ -42,4 +43,10 @@ pub struct Song {
     pub artist: String,
     pub title: String,
     pub path: PathBuf
+}
+
+impl Display for Song {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} - {}", self.title, self.artist)
+    }
 }

@@ -2,13 +2,16 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 use crossbeam_queue::SegQueue;
+use crossterm::event::{poll, read};
+use crossterm::terminal::is_raw_mode_enabled;
+use crossterm::event::Event;
 use crate::Commands;
 use crate::gui::Gui;
 use crate::playlist::Playlist;
 
 pub struct App;
 
-pub enum Event {
+pub enum AppEvent {
     Exit,
     Continue
 }
@@ -19,10 +22,15 @@ impl App {
 
         loop {
             gui.draw();
-            if let Some(event) = gui.handle_key_events() {
-                match event {
-                    Event::Exit => break,
-                    Event::Continue => continue
+
+            if poll(Duration::from_millis(1)).unwrap() {
+                let app_event = match read().unwrap() {
+                    Event::Key(event) => gui.handle_key_event(event),
+                    _ => Some(AppEvent::Continue)
+                };
+
+                if let Some(AppEvent::Exit) = app_event {
+                    break;
                 }
             }
         }
