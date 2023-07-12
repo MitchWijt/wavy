@@ -1,18 +1,13 @@
-use std::fmt::format;
-use std::fs::{File};
-use std::io::{BufReader, Read, Seek, SeekFrom, stdin};
-use std::sync::{Arc, Mutex, MutexGuard};
-use std::thread;
-use std::time::Duration;
+use std::fs::File;
+use std::io::{BufReader, Read, Seek, SeekFrom};
+use std::sync::{Arc};
+
 use crossbeam_queue::SegQueue;
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MediaKeyCode};
-use crossterm::terminal::disable_raw_mode;
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use rand::Rng;
-use termion::async_stdin;
-use termion::event::Key;
-use termion::input::TermRead;
+
 use crate::{GuiToPlayerCommands, PlayerToGuiCommands, Playlist, Terminal};
-use crate::app::{App, AppEvent};
+use crate::app::{AppEvent};
 use crate::playlist::Song;
 
 pub struct Gui {

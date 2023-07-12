@@ -1,11 +1,7 @@
 use std::fmt::Display;
 use std::io::{Stdout, stdout, Write};
-use std::ptr::write;
-use crossterm::event::{KeyboardEnhancementFlags, PushKeyboardEnhancementFlags};
 use crossterm::execute;
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen};
-use termion::raw::{IntoRawMode, RawTerminal};
-use termion::screen::{AlternateScreen, IntoAlternateScreen};
 
 
 pub struct Terminal {
@@ -17,7 +13,7 @@ pub struct Terminal {
 impl Terminal {
     pub fn new() -> Self {
         let mut stdout = stdout();
-        execute!(stdout, EnterAlternateScreen);
+        execute!(stdout, EnterAlternateScreen).unwrap();
         enable_raw_mode().unwrap();
 
         Terminal {
@@ -25,10 +21,6 @@ impl Terminal {
             cursor_row: 0,
             cursor_col: 0,
         }
-    }
-
-    pub fn leave_raw_mode(&self) {
-        disable_raw_mode().unwrap();
     }
 
     pub fn write<P: Display>(&mut self, text: P) {

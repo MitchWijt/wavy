@@ -1,19 +1,8 @@
-use std::sync::{Arc, mpsc, Mutex};
-use std::sync::mpsc::Sender;
-use std::{io, thread};
-use std::collections::HashMap;
-use std::fs::{File, read_dir};
-use std::io::{BufReader, Read};
-use std::os::macos::raw::stat;
-use std::path::{Path, PathBuf};
-use std::process::exit;
-use std::time::Duration;
-use cpal::{Device, Host, OutputCallbackInfo, Sample, SampleRate, StreamConfig};
-use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use std::sync::{Arc};
+use cpal::{Sample};
 use crossbeam_queue::SegQueue;
 use simple_bytes::{Bytes, BytesRead};
-use crate::playback_duration::{PlaybackDuration};
-use crate::{GuiToPlayerCommands, PlayerToGuiCommands, Wav};
+use crate::{GuiToPlayerCommands, PlayerToGuiCommands};
 
 pub struct Player {
     buffer_index: usize,

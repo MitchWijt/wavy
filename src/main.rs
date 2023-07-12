@@ -1,26 +1,13 @@
-use std::fmt::format;
-use std::fs::File;
-use std::io::{BufReader, stdin, stdout};
-use std::thread;
-use std::thread::Thread;
-use std::time::Duration;
-use termion::raw::IntoRawMode;
-use termion::input::TermRead;
-use termion::screen::{AlternateScreen, IntoAlternateScreen};
-use crate::player::Player;
-use crate::wav::Wav;
-use std::io::Write;
-use std::path::PathBuf;
-use std::process::exit;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
+
 use crossbeam_queue::SegQueue;
-use termion::event::Key;
+
 use crate::app::App;
-use crate::gui::Gui;
 use crate::output::Output;
+use crate::player::Player;
 use crate::playlist::Playlist;
-use crate::progress_bar::ProgressBar;
 use crate::terminal::Terminal;
+use crate::wav::Wav;
 
 mod player;
 mod wav;

@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter};
-use std::fs::{File, read_dir};
-use std::path::{Path, PathBuf};
+use std::fs::{read_dir};
+use std::path::{PathBuf};
 use crate::wav::Wav;
 
 pub struct Playlist {
