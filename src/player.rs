@@ -1,32 +1,20 @@
-use std::sync::{Arc, mpsc, Mutex};
-use std::sync::mpsc::Sender;
-use std::{io, thread};
-use std::collections::HashMap;
-use std::fs::{File, read_dir};
-use std::io::{BufReader, Read};
-use std::os::macos::raw::stat;
-use std::path::{Path, PathBuf};
-use std::process::exit;
-use std::time::Duration;
-use cpal::{Device, Host, OutputCallbackInfo, Sample, SampleRate, StreamConfig};
-use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use std::sync::{Arc};
+use cpal::{Sample};
 use crossbeam_queue::SegQueue;
 use simple_bytes::{Bytes, BytesRead};
-use crate::playback_duration::{PlaybackDuration};
-use crate::{Commands, Wav};
-
+use crate::{GuiToPlayerCommands, PlayerToGuiCommands};
 
 pub struct Player {
     buffer_index: usize,
     bytes_read: usize,
     buffer: Option<Vec<u8>>,
     playback_state: PlaybackState,
-    from_gui_queue: Arc<SegQueue<Commands>>,
-    to_gui_queue: Arc<SegQueue<Commands>>
+    from_gui_queue: Arc<SegQueue<GuiToPlayerCommands>>,
+    to_gui_queue: Arc<SegQueue<PlayerToGuiCommands>>
 }
 
 impl Player {
-    pub fn new(from_gui_queue: Arc<SegQueue<Commands>>, to_gui_queue: Arc<SegQueue<Commands>>) -> Self {
+    pub fn new(from_gui_queue: Arc<SegQueue<GuiToPlayerCommands>>, to_gui_queue: Arc<SegQueue<PlayerToGuiCommands>>) -> Self {
         Player {
             buffer: None,
             buffer_index: 0,
@@ -40,21 +28,44 @@ impl Player {
     pub fn process(&mut self, data: &mut [f32]) {
         while let Some(command) = self.from_gui_queue.pop() {
             match command {
-                Commands::PLAY {
+                GuiToPlayerCommands::Play {
                     buffer
                 } => {
                     self.playback_state = PlaybackState::Playing;
                     self.buffer = Some(buffer);
                     self.buffer_index = 0;
                     self.bytes_read = 0;
+
+                    self.to_gui_queue.push(PlayerToGuiCommands::Playing);
                 },
-                Commands::PAUSE => {
+                GuiToPlayerCommands::Pause => {
                     self.playback_state = PlaybackState::Paused;
+                    self.to_gui_queue.push(PlayerToGuiCommands::Paused);
                 },
-                Commands::PLAYRESUME => {
+                GuiToPlayerCommands::PlayResume => {
                     self.playback_state = PlaybackState::Playing;
+                    self.to_gui_queue.push(PlayerToGuiCommands::Playing);
                 },
-                _ => {}
+                GuiToPlayerCommands::Forward => {
+                    let sample_rate = 44100;
+                    let bytes_per_s = sample_rate * 4;
+                    let forwarded_amount = bytes_per_s * 15;
+                    self.bytes_read += forwarded_amount;
+                    self.buffer_index += forwarded_amount;
+                }
+                GuiToPlayerCommands::Rewind => {
+                    let sample_rate = 44100;
+                    let bytes_per_s = sample_rate * 4;
+                    let forwarded_amount = bytes_per_s * 15;
+
+                    if self.bytes_read < forwarded_amount {
+                        self.bytes_read = 0;
+                        self.buffer_index = 0;
+                    } else {
+                        self.bytes_read -= forwarded_amount;
+                        self.buffer_index -= forwarded_amount;
+                    }
+                }
             }
         }
 
@@ -69,7 +80,13 @@ impl Player {
         }
 
         for sample in data.iter_mut() {
-            let sample_bytes = &self.buffer.as_ref().unwrap()[self.buffer_index..self.buffer_index + 2];
+            let buffer = &self.buffer.as_ref().unwrap();
+            if self.buffer_index + 1 > buffer.len() {
+                self.to_gui_queue.push(PlayerToGuiCommands::End);
+                self.buffer = None;
+                return;
+            }
+            let sample_bytes = &buffer[self.buffer_index..self.buffer_index + 2];
             let mut bytes: Bytes = sample_bytes.into();
             let sample_value = bytes.read_le_i16();
 

@@ -1,16 +1,13 @@
-use std::cmp::min;
 use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io;
-use std::io::{BufReader, Read, Seek};
+use std::io::{BufReader, Read};
 use std::path::Path;
-use std::ptr::write;
 use std::time::Duration;
 
 pub struct Wav {
     pub header: WavHeader,
-    pub duration: WavDuration,
-    pub audio_data_reader: BufReader<File>,
+    pub duration: WavDuration
 }
 
 impl Wav {
@@ -26,24 +23,8 @@ impl Wav {
 
         Wav {
             header,
-            duration,
-            audio_data_reader: reader,
+            duration
         }
-    }
-
-    pub fn load_data(&mut self) -> Result<Vec<u8>, io::Error> {
-        let chunk_size = self.header.data.chunk_size as usize;
-        let mut buffer = vec![0u8; chunk_size];
-        self.audio_data_reader.read_exact(&mut buffer)?;
-
-        Ok(buffer)
-    }
-
-    pub fn read_buffer(&mut self, size: usize) -> Result<Vec<u8>, io::Error> {
-        let mut buffer = vec![0u8; size];
-        self.audio_data_reader.read_exact(&mut buffer)?;
-
-        Ok(buffer)
     }
 }
 

@@ -1,18 +1,23 @@
 use std::fmt::Display;
 use std::io::{Stdout, stdout, Write};
-use termion::raw::{IntoRawMode, RawTerminal};
-use termion::screen::{AlternateScreen, IntoAlternateScreen};
+use crossterm::execute;
+use crossterm::terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen};
+
 
 pub struct Terminal {
-    stdout: AlternateScreen<RawTerminal<Stdout>>,
+    stdout: Stdout,
     pub cursor_row: u16,
     pub cursor_col: u16
 }
 
 impl Terminal {
     pub fn new() -> Self {
+        let mut stdout = stdout();
+        execute!(stdout, EnterAlternateScreen).unwrap();
+        enable_raw_mode().unwrap();
+
         Terminal {
-            stdout: stdout().into_raw_mode().unwrap().into_alternate_screen().unwrap(),
+            stdout,
             cursor_row: 0,
             cursor_col: 0,
         }
@@ -27,6 +32,11 @@ impl Terminal {
         self.cursor_col = 1;
         self.cursor_row = 1;
         write!(self.stdout, "{}{}{}",termion::cursor::Goto(1,1), termion::clear::BeforeCursor, termion::cursor::Hide).unwrap();
+        self.stdout.flush().unwrap();
+    }
+
+    pub fn clear_line(&mut self) {
+        write!(self.stdout, "{}", termion::clear::CurrentLine).unwrap();
         self.stdout.flush().unwrap();
     }
 

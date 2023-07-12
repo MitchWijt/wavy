@@ -1,7 +1,6 @@
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex};
 use crate::playback_duration::PlaybackDuration;
 use crate::terminal::Terminal;
-use crate::wav::WavDuration;
 
 pub struct ProgressBar {
     max_ticks: f32

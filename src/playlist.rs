@@ -1,5 +1,6 @@
-use std::fs::{File, read_dir};
-use std::path::{Path, PathBuf};
+use std::fmt::{Display, Formatter};
+use std::fs::{read_dir};
+use std::path::{PathBuf};
 use crate::wav::Wav;
 
 pub struct Playlist {
@@ -27,9 +28,7 @@ impl Playlist {
                 path: PathBuf::from(&path),
                 wav: Wav::new(path),
                 artist,
-                title,
-                playing: false,
-
+                title
             })
         }
 
@@ -43,6 +42,11 @@ pub struct Song {
     pub wav: Wav,
     pub artist: String,
     pub title: String,
-    pub playing: bool,
     pub path: PathBuf
+}
+
+impl Display for Song {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} - {}", self.title, self.artist)
+    }
 }
