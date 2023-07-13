@@ -1,6 +1,4 @@
 use std::sync::{Arc};
-use std::time;
-use std::time::Duration;
 use cpal::{Sample};
 use crossbeam_queue::SegQueue;
 use simple_bytes::{Bytes, BytesRead};

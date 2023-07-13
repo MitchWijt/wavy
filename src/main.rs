@@ -7,10 +7,8 @@ use crate::output::Output;
 use crate::player::Player;
 use crate::playlist::Playlist;
 use crate::terminal::Terminal;
-use crate::wav::Wav;
 
 mod player;
-mod wav;
 mod playback_duration;
 mod terminal;
 mod progress_bar;
@@ -18,6 +16,7 @@ mod playlist;
 mod gui;
 mod output;
 mod app;
+mod wav;
 
 pub enum GuiToPlayerCommands {
     Play {

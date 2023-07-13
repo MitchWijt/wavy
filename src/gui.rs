@@ -1,8 +1,6 @@
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::sync::{Arc};
-use std::time;
-use std::time::Duration;
 
 use crossbeam_queue::SegQueue;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};

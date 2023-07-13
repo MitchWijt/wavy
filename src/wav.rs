@@ -1,9 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::fs::File;
-use std::io;
 use std::io::{BufReader, Read};
 use std::path::Path;
-use std::time::Duration;
 
 pub struct Wav {
     pub header: WavHeader,
@@ -111,6 +109,7 @@ impl WavHeader {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct RiffChunk {
     chunk_id: String,
     chunk_size: u32,

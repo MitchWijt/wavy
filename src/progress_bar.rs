@@ -1,4 +1,3 @@
-use std::sync::{Arc, Mutex};
 use crate::playback_duration::PlaybackDuration;
 use crate::terminal::Terminal;
 use crate::wav::WavDuration;
