@@ -1,6 +1,8 @@
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::sync::{Arc};
+use std::time;
+use std::time::Duration;
 
 use crossbeam_queue::SegQueue;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -8,7 +10,9 @@ use rand::Rng;
 
 use crate::{GuiToPlayerCommands, PlayerToGuiCommands, Playlist, Terminal};
 use crate::app::{AppEvent};
+use crate::playback_duration::PlaybackDuration;
 use crate::playlist::Song;
+use crate::progress_bar::ProgressBar;
 
 pub struct Gui {
     to_gui_queue: Arc<SegQueue<PlayerToGuiCommands>>,
@@ -19,6 +23,8 @@ pub struct Gui {
     prev_index: Option<usize>,
     shuffle: bool,
     playing: bool,
+    playback_duration: PlaybackDuration,
+    progress_bar: ProgressBar
 }
 
 impl Gui {
@@ -31,7 +37,9 @@ impl Gui {
             terminal: Terminal::new(),
             shuffle: false,
             prev_index: None,
-            playing: false
+            playing: false,
+            playback_duration: PlaybackDuration::new(),
+            progress_bar: ProgressBar::new()
         }
     }
 
@@ -47,6 +55,11 @@ impl Gui {
                 PlayerToGuiCommands::Paused => {
                     self.playing = false;
                 }
+                PlayerToGuiCommands::UpdateDuration {
+                    duration
+                } => {
+                    self.playback_duration.advance(duration)
+                }
             }
         }
 
@@ -54,11 +67,13 @@ impl Gui {
         let active_song = self.playlist.songs.get(self.playlist_index).unwrap();
 
         self.terminal.clear();
-        for song in songs {
-            self.terminal.cursor_row += 1;
-            self.terminal.cursor_col = 1;
-            self.terminal.set_cursor();
-            self.terminal.write(song);
+        for song_idx in 0..songs.len() {
+            if let Some(song) = songs.get(song_idx) {
+                self.terminal.cursor_row += 1;
+                self.terminal.cursor_col = 1;
+                self.terminal.set_cursor();
+                self.terminal.write(format!("#{} {}", song_idx + 1, song));
+            }
         }
 
         self.terminal.cursor_row += 2;
@@ -66,6 +81,11 @@ impl Gui {
         self.terminal.set_cursor();
         self.terminal.clear_line();
         self.terminal.write(active_song);
+
+        self.terminal.cursor_row += 1;
+        self.terminal.set_cursor();
+        self.terminal.clear_line();
+        self.progress_bar.update(&self.playback_duration, active_song.wav.duration, &mut self.terminal);
 
         self.terminal.cursor_row += 2;
         self.terminal.set_cursor();
@@ -75,7 +95,7 @@ impl Gui {
         self.terminal.cursor_row += 1;
         self.terminal.set_cursor();
         self.terminal.clear_line();
-        self.terminal.write(format!("Shuffle: {}", self.shuffle))
+        self.terminal.write(format!("Shuffle: {}", self.shuffle));
     }
 
     pub fn handle_key_event(&mut self, event: KeyEvent) -> Option<AppEvent> {
@@ -150,21 +170,6 @@ impl Gui {
         }
     }
 
-    pub fn load_buffer(&self, playlist_index: usize) -> Vec<u8> {
-        let song: &Song = self.playlist.songs.get(playlist_index).unwrap();
-        let file = File::open(&song.path).unwrap();
-
-        let mut reader = BufReader::new(file);
-
-        // set seek position after the RIFF header
-        reader.seek(SeekFrom::Start(44)).unwrap();
-
-        let mut buffer = vec![0u8; song.wav.header.data.chunk_size as usize];
-        reader.read_exact(&mut *buffer).unwrap();
-
-        buffer
-    }
-
     fn next_song(&mut self) {
         let index = self.next_index();
         self.play_song(index);
@@ -221,5 +226,20 @@ impl Gui {
 
             self.playlist_index
         }
+    }
+
+    pub fn load_buffer(&self, playlist_index: usize) -> Vec<u8> {
+        let song: &Song = self.playlist.songs.get(playlist_index).unwrap();
+        let file = File::open(&song.path).unwrap();
+
+        let mut reader = BufReader::new(file);
+
+        // set seek position after the RIFF header
+        reader.seek(SeekFrom::Start(44)).unwrap();
+
+        let mut buffer = vec![0u8; song.wav.header.data.chunk_size as usize];
+        reader.read_exact(&mut *buffer).unwrap();
+
+        buffer
     }
 }

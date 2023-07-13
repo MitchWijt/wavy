@@ -32,7 +32,10 @@ pub enum GuiToPlayerCommands {
 pub enum PlayerToGuiCommands {
     End,
     Playing,
-    Paused
+    Paused,
+    UpdateDuration {
+        duration: u128
+    }
 }
 
 fn main() {

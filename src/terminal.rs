@@ -41,13 +41,11 @@ impl Terminal {
     }
 
     pub fn set_cursor_right(&mut self, col: u16) {
-        self.cursor_col += col;
         write!(self.stdout, "{}", termion::cursor::Right(col)).unwrap();
         self.stdout.flush().unwrap();
     }
 
     pub fn set_cursor_left(&mut self, col: u16) {
-        self.cursor_col -= col;
         write!(self.stdout, "{}", termion::cursor::Left(col)).unwrap();
         self.stdout.flush().unwrap();
     }

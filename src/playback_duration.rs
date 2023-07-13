@@ -1,28 +1,31 @@
 use std::fmt::{Display, Formatter};
 
 pub struct PlaybackDuration {
-    pub milliseconds: u32,
-    pub raw_seconds: u32,
-    pub seconds: u32,
-    pub minutes: u32,
+    pub milliseconds: u128,
+    seconds: u32,
+    minutes: u32,
 }
 
 impl PlaybackDuration {
     pub fn new() -> Self {
         PlaybackDuration {
             milliseconds: 0,
-            raw_seconds: 0,
             seconds: 0,
             minutes: 0,
         }
     }
 
-    pub fn advance(&mut self) {
-        self.raw_seconds += 1;
-        self.seconds += 1;
-        if self.seconds == 60 {
-            self.minutes += 1;
+    pub fn advance(&mut self, ms: u128) {
+        self.milliseconds = ms;
+
+        if self.milliseconds < 1000 {
             self.seconds = 0;
+            self.minutes = 0;
+        }
+
+        if self.milliseconds % 1000 == 0 {
+            self.seconds = ((self.milliseconds / 1000) % 60) as u32;
+            self.minutes = ((self.milliseconds / 1000) / 60) as u32;
         }
     }
 }
