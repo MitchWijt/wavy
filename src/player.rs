@@ -94,6 +94,14 @@ impl Player {
 
             self.bytes_read += 2;
             self.buffer_index += 2;
+
+            let bytes_per_ms = 44100 * 4 / 1000;
+            if self.bytes_read % bytes_per_ms == 0 {
+                let milliseconds = (self.bytes_read / bytes_per_ms) as u128;
+                self.to_gui_queue.push(PlayerToGuiCommands::UpdateDuration {
+                    duration: milliseconds
+                })
+            }
         }
     }
 }
