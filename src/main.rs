@@ -31,6 +31,7 @@ pub enum GuiToPlayerCommands {
 pub enum PlayerToGuiCommands {
     End,
     Playing,
+    Play,
     Paused,
     UpdateDuration {
         duration: u128

@@ -1,10 +1,12 @@
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::sync::{Arc};
 
 use crossbeam_queue::SegQueue;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use rand::Rng;
+use rand::{Rng, thread_rng};
+use rand::prelude::SliceRandom;
 
 use crate::{GuiToPlayerCommands, PlayerToGuiCommands, Playlist, Terminal};
 use crate::app::{AppEvent};
@@ -22,7 +24,8 @@ pub struct Gui {
     shuffle: bool,
     playing: bool,
     playback_duration: PlaybackDuration,
-    progress_bar: ProgressBar
+    progress_bar: ProgressBar,
+    active_song: Option<Song>
 }
 
 impl Gui {
@@ -33,11 +36,12 @@ impl Gui {
             playlist: Playlist::new(),
             playlist_index: 0,
             terminal: Terminal::new(),
+            playback_duration: PlaybackDuration::new(),
+            progress_bar: ProgressBar::new(),
             shuffle: false,
             prev_index: None,
             playing: false,
-            playback_duration: PlaybackDuration::new(),
-            progress_bar: ProgressBar::new()
+            active_song: None
         }
     }
 
@@ -47,6 +51,14 @@ impl Gui {
                 PlayerToGuiCommands::End => {
                     self.next_song();
                 }
+                PlayerToGuiCommands::Play => {
+                    self.playing = true;
+
+                    let song = self.get_song(self.playlist_index);
+                    let active_song  = Song::from_path(song.path.clone());
+
+                    self.active_song = Some(active_song);
+                },
                 PlayerToGuiCommands::Playing => {
                     self.playing = true;
                 }
@@ -62,7 +74,6 @@ impl Gui {
         }
 
         let songs = &self.playlist.songs;
-        let active_song = self.playlist.songs.get(self.playlist_index).unwrap();
 
         self.terminal.clear();
         for song_idx in 0..songs.len() {
@@ -74,16 +85,18 @@ impl Gui {
             }
         }
 
-        self.terminal.cursor_row += 2;
-        self.terminal.cursor_col = 1;
-        self.terminal.set_cursor();
-        self.terminal.clear_line();
-        self.terminal.write(active_song);
+        if let Some(active_song) = &self.active_song {
+            self.terminal.cursor_row += 2;
+            self.terminal.cursor_col = 1;
+            self.terminal.set_cursor();
+            self.terminal.clear_line();
+            self.terminal.write(active_song);
 
-        self.terminal.cursor_row += 1;
-        self.terminal.set_cursor();
-        self.terminal.clear_line();
-        self.progress_bar.update(&self.playback_duration, active_song.wav.duration, &mut self.terminal);
+            self.terminal.cursor_row += 1;
+            self.terminal.set_cursor();
+            self.terminal.clear_line();
+            self.progress_bar.update(&self.playback_duration, active_song.wav.duration, &mut self.terminal);
+        }
 
         self.terminal.cursor_row += 2;
         self.terminal.set_cursor();
@@ -129,7 +142,7 @@ impl Gui {
                 modifiers: KeyModifiers::NONE,
                 ..
             } => {
-                self.shuffle = !self.shuffle;
+                self.shuffle();
                 Some(AppEvent::Continue)
             }
             KeyEvent {
@@ -186,48 +199,28 @@ impl Gui {
     }
 
     pub fn next_index(&mut self) -> usize {
-        if self.shuffle {
-            let range = 0..self.playlist.songs.len();
-            let index = rand::thread_rng().gen_range(range);
-
-            self.prev_index = Some(self.playlist_index);
-            self.playlist_index = index;
-            self.playlist_index
+        self.prev_index = Some(self.playlist_index);
+        if self.playlist_index + 1 > self.playlist.songs.len() - 1 {
+            self.playlist_index = 0;
         } else {
-            self.prev_index = Some(self.playlist_index);
-            if self.playlist_index + 1 > self.playlist.songs.len() - 1 {
-                self.playlist_index = 0;
-            } else {
-                self.playlist_index += 1;
-            }
-
-            self.playlist_index
+            self.playlist_index += 1;
         }
+
+        self.playlist_index
     }
 
     pub fn prev_index(&mut self) -> usize {
-        if self.shuffle {
-            let index = match self.prev_index {
-                Some(v) => v,
-                None => self.next_index()
-            };
-
-            self.prev_index = None;
-            self.playlist_index = index;
-            self.playlist_index
+        if self.playlist_index == 0 {
+            self.playlist_index = self.playlist.songs.len() - 1
         } else {
-            if self.playlist_index == 0 {
-                self.playlist_index = self.playlist.songs.len() - 1
-            } else {
-                self.playlist_index -= 1;
-            }
-
-            self.playlist_index
+            self.playlist_index -= 1;
         }
+
+        self.playlist_index
     }
 
     pub fn load_buffer(&self, playlist_index: usize) -> Vec<u8> {
-        let song: &Song = self.playlist.songs.get(playlist_index).unwrap();
+        let song = self.get_song(playlist_index);
         let file = File::open(&song.path).unwrap();
 
         let mut reader = BufReader::new(file);
@@ -239,5 +232,22 @@ impl Gui {
         reader.read_exact(&mut *buffer).unwrap();
 
         buffer
+    }
+
+    fn get_song(&self, playlist_index: usize) -> &Song {
+        let index = self.playlist.indexes.get(playlist_index).unwrap();
+        let song: &Song = self.playlist.songs.get(*index).unwrap();
+
+        song
+    }
+
+    fn shuffle(&mut self) {
+        if self.shuffle {
+            self.shuffle = false;
+            self.playlist.indexes.sort();
+        } else {
+            self.shuffle = true;
+            self.playlist.indexes.shuffle(&mut thread_rng());
+        }
     }
 }
