@@ -36,7 +36,7 @@ impl Player {
                     self.buffer_index = 0;
                     self.bytes_read = 0;
 
-                    self.to_gui_queue.push(PlayerToGuiCommands::Playing);
+                    self.to_gui_queue.push(PlayerToGuiCommands::Play);
                 },
                 GuiToPlayerCommands::Pause => {
                     self.playback_state = PlaybackState::Paused;
