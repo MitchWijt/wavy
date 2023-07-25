@@ -200,7 +200,7 @@ impl Gui {
 
     pub fn next_index(&mut self) -> usize {
         self.prev_index = Some(self.playlist_index);
-        if self.playlist_index + 1 > self.playlist.songs.len() - 1 {
+        if self.playlist_index + 1 > self.playlist.indexes.len() - 1 {
             self.playlist_index = 0;
         } else {
             self.playlist_index += 1;
@@ -211,7 +211,7 @@ impl Gui {
 
     pub fn prev_index(&mut self) -> usize {
         if self.playlist_index == 0 {
-            self.playlist_index = self.playlist.songs.len() - 1
+            self.playlist_index = self.playlist.indexes.len() - 1
         } else {
             self.playlist_index -= 1;
         }
